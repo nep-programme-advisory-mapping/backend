@@ -256,9 +256,9 @@ class RoleManagementController extends Controller
     )]
     public function destroy(Role $role): JsonResponse
     {
-        if ($role->is_system) {
+        if ($role->name === 'nep_admin') {
             return response()->json([
-                'message' => 'System roles cannot be deleted.',
+                'message' => 'The NEP Administrator role cannot be deleted.',
             ], 422);
         }
 

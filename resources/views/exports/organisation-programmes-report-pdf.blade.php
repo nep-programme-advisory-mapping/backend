@@ -498,9 +498,6 @@
         </div>
         @endif
 
-        <div class="footer">
-            Confidential — NGO Education Partnership (NEP) System • All Programmes Export for {{ $organisation->name }}
-        </div>
     @endforeach
 
 </body>

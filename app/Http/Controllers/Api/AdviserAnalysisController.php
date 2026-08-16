@@ -7,9 +7,8 @@ use App\Models\AdvisoryNote;
 use App\Models\Province;
 use App\Services\Adviser\MapOverlapMatcher;
 use App\Services\Adviser\ProfileExtractor;
-use App\Services\AI\ClaudeService;
+use App\Services\AI\GroqService;
 use App\Services\AI\PromptBuilder;
-use App\Support\AdvisoryNoteStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -27,9 +26,11 @@ class AdviserAnalysisController extends Controller
     ): JsonResponse {
         $submission = AdvisoryNote::findOrFail($id);
 
-        // Authorization is enforced by the route's permission:advisory.update
-        // middleware — this used to also hardcode role checks here, which
-        // silently overrode any grant of that permission to a different role.
+        $user = $request->user();
+        if (!$user->isNepAdmin() && $user->role !== 'nep_coordinator') {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
         $documentText  = $this->cleanExtractedText($submission->document_text ?? '');
         $documentText  = $documentText ?: null;
         $analysisScope = $submission->analysis_scope ?? 'full map';
@@ -79,52 +80,37 @@ class AdviserAnalysisController extends Controller
             $submission->submitting_party
         );
 
-        try {
-            $claude     = App::make(ClaudeService::class);
-            $aiResponse = $claude->generateContent($prompt);
+        $groq       = App::make(GroqService::class);
+        $aiResponse = $groq->generateContent($prompt);
 
-            $updateData = ['status' => AdvisoryNoteStatus::ANALYSED];
-            if (!empty($aiResponse['section_a'])) $updateData['section_profile']            = $aiResponse['section_a'];
-            if (!empty($aiResponse['section_c'])) $updateData['section_gaps']               = $aiResponse['section_c'];
-            if (!empty($aiResponse['section_d'])) $updateData['section_coordinators_notes'] = $aiResponse['section_d'];
-            $submission->update($updateData);
+        $submission->update([
+            'status'                     => 'analysed',
+            'section_profile'            => $aiResponse['section_a'] ?? null,
+            'section_gaps'               => $aiResponse['section_c'] ?? null,
+            'section_coordinators_notes' => $aiResponse['section_d'] ?? null,
+        ]);
 
-            $submission->recommendations()->delete();
-            if (is_array($aiResponse['section_b'] ?? null)) {
-                foreach ($aiResponse['section_b'] as $rec) {
-                    $type = $rec['overlap_type'] ?? 'Geographic overlap';
-                    $submission->recommendations()->create([
-                        'organisation_name' => $rec['organisation'] ?? null,
-                        'programme_name'    => $rec['programme_name'] ?? null,
-                        'type'              => $type,
-                        'relational'        => $rec['rationale'] ?? $type,
-                        'rationale'         => $rec['rationale'] ?? null,
-                    ]);
-                }
+        $submission->recommendations()->delete();
+        if (is_array($aiResponse['section_b'] ?? null)) {
+            foreach ($aiResponse['section_b'] as $rec) {
+                $type = $rec['overlap_type'] ?? 'Geographic overlap';
+                $submission->recommendations()->create([
+                    'organisation_name' => $rec['organisation'] ?? null,
+                    'programme_name'    => $rec['programme_name'] ?? null,
+                    'type'              => $type,
+                    'relational'        => $rec['rationale'] ?? $type,
+                    'rationale'         => $rec['rationale'] ?? null,
+                ]);
             }
-
-            $aiResponse['map_overlap_entries'] = $mapOverlapEntries;
-            $aiResponse['recommendations']     = $submission->fresh()->recommendations()->with('programmeEntry.organisation:id,name')->get();
-
-            return response()->json([
-                'message' => 'Advisory note generated successfully.',
-                'data'    => $aiResponse,
-            ]);
-        } catch (\Throwable $e) {
-            $code = $e->getCode();
-            $http = in_array($code, [400, 401, 403, 404, 429, 500, 502, 503]) ? $code : 503;
-            if ($http < 100 || $http > 599) $http = 503;
-
-            Log::warning('Advisory note generation failed', [
-                'submission_id' => $submission->id,
-                'error'         => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'message' => 'Map overlaps found but AI generation failed — please retry.',
-                'data'    => ['map_overlap_entries' => $mapOverlapEntries, 'ai_failed' => true],
-            ]);
         }
+
+        $aiResponse['map_overlap_entries'] = $mapOverlapEntries;
+        $aiResponse['recommendations']     = $submission->fresh()->recommendations()->with('programmeEntry.organisation:id,name')->get();
+
+        return response()->json([
+            'message' => 'Advisory note generated successfully.',
+            'data'    => $aiResponse,
+        ]);
     }
 
     private function resolveProfile(Request $request, AdvisoryNote $submission, ?string $documentText): array

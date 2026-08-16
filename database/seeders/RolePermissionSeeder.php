@@ -117,12 +117,6 @@ class RolePermissionSeeder extends Seeder
             'is_system' => true,
             'is_super_admin' => false,
         ],
-        'nep_staff' => [
-            'display_name' => 'NEP Staff',
-            'description' => 'Authors and manages the programme entries they personally create, without organisation-wide oversight',
-            'is_system' => true,
-            'is_super_admin' => false,
-        ],
     ];
 
     /**
@@ -169,19 +163,6 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
             'reports.export',
             'policy.view',
-        ],
-        'nep_staff' => [
-            // view-own, not view: this role has no organisation_id of its
-            // own (same "staff-like" shape as nep_admin/nep_coordinator —
-            // see User::hasOrganisationWideAccess()), so without view-own it
-            // would default to seeing every organisation's entries. This is
-            // the one role that actually exercises that override.
-            'programmes.view-own',
-            'programmes.create',
-            'programmes.update',
-            // Needed to populate the taxonomy pickers on the programme entry
-            // form, same as member_org above.
-            'taxonomy.view',
         ],
     ];
 

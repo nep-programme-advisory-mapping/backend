@@ -563,10 +563,21 @@ class ProgrammeEntryController extends Controller
     )]
     public function verify(Request $request, ProgrammeEntry $programmeEntry)
     {
-        // Authorization is enforced by the route's permission:programmes.verify
-        // middleware. A hardcoded role==='nep_admin' check used to be
-        // duplicated here, which silently overrode any grant of that
-        // permission to a role other than the literal 'nep_admin' string.
+        // The route's permission:programmes.verify middleware only answers
+        // "can this user verify *something*" — same two-layer split as
+        // update()/show() elsewhere in this controller. Which specific
+        // entry they may verify is the scope check below, reusing the same
+        // ownership rule (own organisation, or organisation-wide access)
+        // every other write on a programme entry already uses. Without
+        // this, granting programmes.verify to an organisation-bound role
+        // (e.g. member_org) would let them verify any organisation's entry,
+        // not just their own.
+        if (! $this->canManage($request, $programmeEntry)) {
+            return response()->json([
+                'message' => 'You are not authorized to verify this entry.',
+            ], 403);
+        }
+
         $programmeEntry->verified_date = now();
         $programmeEntry->save(); // saving() hook automatically sets is_unverified = false
 
@@ -604,8 +615,15 @@ class ProgrammeEntryController extends Controller
 
     public function exportOrganisationProgrammesPdf(Request $request, Organisation $organisation)
     {
+        // Was hardcoded to role === 'member_org' — meant any *other*
+        // org-bound custom role could export another organisation's full
+        // programme list, since the literal string check only ever
+        // recognized member_org by name. hasOrganisationWideAccess() is the
+        // same data-driven scoping rule used everywhere else in this
+        // controller (see ScopesProgrammeEntryAccess): org-bound users are
+        // confined to their own organisation, everyone else passes through.
         $user = $request->user();
-        if ($user->role === 'member_org' && (int)$user->organisation_id !== (int)$organisation->id) {
+        if (! $user->hasOrganisationWideAccess() && (int) $user->organisation_id !== (int) $organisation->id) {
             return response()->json(['message' => 'Forbidden. You do not have permission to export programmes for this organisation.'], 403);
         }
 

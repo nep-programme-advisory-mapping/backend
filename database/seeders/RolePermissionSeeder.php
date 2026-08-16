@@ -22,11 +22,20 @@ class RolePermissionSeeder extends Seeder
         ['name' => 'users.delete', 'display_name' => 'Delete Users', 'group' => 'Users', 'description' => 'Delete user accounts'],
         ['name' => 'users.assign-roles', 'display_name' => 'Assign Roles', 'group' => 'Users', 'description' => 'Assign roles to users'],
 
-        // Organisation management
+        // Organisation management — organisations.* below is the admin-side
+        // "manage any organisation" capability (/admin/organisations/*,
+        // unscoped by id). organisation-profile.* is the deliberately
+        // separate, narrower "manage MY OWN organisation" capability
+        // (/organisations/me, inherently scoped to the caller — there's no
+        // id to manipulate). Never grant organisations.update to a
+        // non-admin role expecting it to mean "their own org only" — it
+        // means every organisation, by design.
         ['name' => 'organisations.view', 'display_name' => 'View Organisations', 'group' => 'Organisations', 'description' => 'View organisations'],
         ['name' => 'organisations.create', 'display_name' => 'Create Organisations', 'group' => 'Organisations', 'description' => 'Create new organisations'],
         ['name' => 'organisations.update', 'display_name' => 'Update Organisations', 'group' => 'Organisations', 'description' => 'Update organisations'],
         ['name' => 'organisations.delete', 'display_name' => 'Delete Organisations', 'group' => 'Organisations', 'description' => 'Delete organisations'],
+        ['name' => 'organisation-profile.view', 'display_name' => "View Own Organisation Profile", 'group' => 'Organisations', 'description' => "View the caller's own organisation profile"],
+        ['name' => 'organisation-profile.update', 'display_name' => "Update Own Organisation Profile", 'group' => 'Organisations', 'description' => "Update the caller's own organisation profile"],
 
         // Programme management
         ['name' => 'programmes.view', 'display_name' => 'View Programmes', 'group' => 'Programmes', 'description' => 'View programme entries'],
@@ -42,6 +51,13 @@ class RolePermissionSeeder extends Seeder
         ['name' => 'programmes.create', 'display_name' => 'Create Programmes', 'group' => 'Programmes', 'description' => 'Create programme entries'],
         ['name' => 'programmes.update', 'display_name' => 'Update Programmes', 'group' => 'Programmes', 'description' => 'Update programme entries'],
         ['name' => 'programmes.verify', 'display_name' => 'Verify Programmes', 'group' => 'Programmes', 'description' => 'Verify programme entries'],
+        // Split from programmes.view: being able to see an entry doesn't
+        // imply being able to export it as a PDF — kept as its own
+        // permission so an admin can grant/revoke export independently
+        // (e.g. programmes.view-own holders never get export at all,
+        // vs. programmes.view holders who may or may not).
+        ['name' => 'programmes.export', 'display_name' => 'Export Programme PDF', 'group' => 'Programmes', 'description' => 'Export a single programme entry as PDF'],
+        ['name' => 'programmes.export-all', 'display_name' => 'Export All Organisation Programmes PDF', 'group' => 'Programmes', 'description' => "Export an organisation's full set of programme entries as PDF"],
 
         // Advisory management
         // advisory.view is deliberately narrow: it's what a member_org user
@@ -130,6 +146,12 @@ class RolePermissionSeeder extends Seeder
             'programmes.view',
             'programmes.create',
             'programmes.update',
+            // Coordinators already reach both PDF export routes today via
+            // programmes.view; export is now its own permission (see
+            // programmes.export/-all above) so these two grants preserve
+            // that existing capability rather than silently taking it away.
+            'programmes.export',
+            'programmes.export-all',
             'advisory.view',
             'advisory.view-all',
             'advisory.create',
@@ -151,6 +173,13 @@ class RolePermissionSeeder extends Seeder
             'programmes.view',
             'programmes.create',
             'programmes.update',
+            // Verify/export are scoped to "own organisation" the same way
+            // view/create/update already are — see ScopesProgrammeEntryAccess
+            // for the actual ownership check applied on top of this
+            // permission grant (organisation_id === user.organisation_id).
+            'programmes.verify',
+            'programmes.export',
+            'programmes.export-all',
             'advisory.view',
             // Needed to populate the taxonomy pickers on the programme entry
             // form — previously granted implicitly by a hardcoded
@@ -163,6 +192,12 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
             'reports.export',
             'policy.view',
+            // Distinct from organisations.* (the admin "manage any
+            // organisation" capability) — this only ever unlocks
+            // /organisations/me, which is inherently scoped to the caller's
+            // own organisation regardless of this permission.
+            'organisation-profile.view',
+            'organisation-profile.update',
         ],
     ];
 
@@ -173,11 +208,22 @@ class RolePermissionSeeder extends Seeder
     }
 
     /**
-     * Create/update one of the three built-in roles and (re)sync its
-     * permission set. Used by run() and reused by UserFactory so
-     * factory-created users (`User::factory()->create(['role' => 'member_org'])`)
-     * get the same real permissions a seeded deployment would have, instead
-     * of duplicating this list in test fixtures.
+     * Create one of the three built-in roles if it doesn't exist yet, and
+     * seed its *default* permission set only at that moment of creation.
+     * Used by run() and reused by UserFactory so factory-created users
+     * (`User::factory()->create(['role' => 'member_org'])`) get the same
+     * real permissions a freshly seeded deployment would have, instead of
+     * duplicating this list in test fixtures.
+     *
+     * Deliberately does NOT re-sync permissions for a role that already
+     * exists: an admin may have added or removed permissions through the
+     * Roles UI since this role was first created, and re-running the seeder
+     * (or, via UserFactory, simply creating another test user) must never
+     * silently overwrite that. A newly-introduced default permission for an
+     * existing installation's built-in role is a one-time upgrade concern,
+     * not something this idempotent seeder handles — see the
+     * grant_default_permissions_to_existing_roles migration for how that's
+     * done instead (additive-only, never removes).
      */
     public static function ensureBuiltInRole(string $roleName): ?Role
     {
@@ -189,9 +235,10 @@ class RolePermissionSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission['name']], $permission);
         }
 
-        $role = Role::updateOrCreate(['name' => $roleName], self::$roleDefinitions[$roleName]);
+        $existingRole = Role::where('name', $roleName)->first();
+        $role = $existingRole ?? Role::create(['name' => $roleName, ...self::$roleDefinitions[$roleName]]);
 
-        if (! $role->is_super_admin) {
+        if ($existingRole === null && ! $role->is_super_admin) {
             $names = self::$rolePermissionNames[$roleName] ?? [];
             $role->permissions()->sync(Permission::whereIn('name', $names)->pluck('id'));
         }
@@ -201,8 +248,13 @@ class RolePermissionSeeder extends Seeder
 
     public function run(): void
     {
+        // firstOrCreate, not updateOrInsert: an admin can rename a
+        // permission's display_name/description via permissions.update —
+        // re-seeding must not revert that on an already-existing row,
+        // same principle as ensureBuiltInRole() below not re-syncing an
+        // existing role's permission set.
         foreach (self::$permissions as $permission) {
-            Permission::updateOrInsert(['name' => $permission['name']], $permission);
+            Permission::firstOrCreate(['name' => $permission['name']], $permission);
         }
 
         foreach (array_keys(self::$roleDefinitions) as $roleName) {

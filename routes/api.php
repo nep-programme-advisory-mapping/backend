@@ -112,15 +112,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/programme-entries/my-drafts', [ProgrammeEntryController::class, 'myDrafts']);
         Route::get('/programme-entries/submitted', [ProgrammeEntryController::class, 'submitted']);
         Route::get('/programme-entries/{programmeEntry}', [ProgrammeEntryController::class, 'show']);
-        Route::get('/programme-entries/{programmeEntry}/pdf', [ProgrammeEntryController::class, 'exportPdf']);
     });
+    // Exporting is a separate capability from viewing — a role can have one
+    // without the other (see programmes.export/-all in RolePermissionSeeder).
+    Route::get('/programme-entries/{programmeEntry}/pdf', [ProgrammeEntryController::class, 'exportPdf'])->middleware('permission:programmes.export');
     Route::post('/programme-entries', [ProgrammeEntryController::class, 'store'])->middleware('permission:programmes.create');
     Route::put('/programme-entries/{programmeEntry}', [ProgrammeEntryController::class, 'update'])->middleware('permission:programmes.update');
     Route::get('/organisations/{organisation}/programme-entries', [ProgrammeEntryController::class, 'index'])->middleware('permission:programmes.view');
-    Route::get('/organisations/{organisation}/programme-entries/pdf', [ProgrammeEntryController::class, 'exportOrganisationProgrammesPdf'])->middleware('permission:programmes.view');
+    Route::get('/organisations/{organisation}/programme-entries/pdf', [ProgrammeEntryController::class, 'exportOrganisationProgrammesPdf'])->middleware('permission:programmes.export-all');
 
-    Route::get('/organisations/me', [OrganisationProfileController::class, 'show']);
-    Route::patch('/organisations/me', [OrganisationProfileController::class, 'update']);
+    // Self-service — always scoped to the caller's own organisation (no id
+    // in the URL to manipulate), so this is deliberately a *different*
+    // permission from organisations.view/update, which is the unscoped
+    // "manage any organisation" admin capability (/admin/organisations/*).
+    Route::get('/organisations/me', [OrganisationProfileController::class, 'show'])->middleware('permission:organisation-profile.view');
+    Route::patch('/organisations/me', [OrganisationProfileController::class, 'update'])->middleware('permission:organisation-profile.update');
 
     Route::patch('/programme-entries/{programmeEntry}/verify', [ProgrammeEntryController::class, 'verify'])
         ->middleware('permission:programmes.verify');

@@ -157,24 +157,28 @@ class RoutePermissionTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_only_nep_admin_can_verify_programme_entry(): void
+    public function test_programme_verification_is_gated_by_permission_and_organisation_scope(): void
     {
         $endpoint = "/api/programme-entries/{$this->programmeEntry->id}/verify";
 
-        // Admin should be able to verify (may fail validation but not auth)
+        // Admin should be able to verify (super admin, every permission implicitly).
         $response = $this->actingAs($this->adminUser)->patchJson($endpoint);
         $response->assertStatus(200);
 
         // Coordinator should be forbidden — verifying is gated by
-        // programmes.verify (permission-based), which coordinator doesn't hold.
+        // programmes.verify (permission-based), which coordinator doesn't
+        // hold by default (see RolePermissionSeeder).
         $response = $this->actingAs($this->coordinatorUser)->patchJson($endpoint);
         $response->assertForbidden();
         $response->assertJsonPath('message', 'Forbidden. You do not have the required permissions.');
 
-        // Member should be forbidden
+        // Member DOES hold programmes.verify by default now, and this entry
+        // belongs to their own organisation — so they're allowed, same as
+        // an org owner being able to edit their own drafts. Cross-org
+        // rejection for a member who *doesn't* own the entry is covered by
+        // ProgrammeVerifyAndOrgProfileAuthorizationTest.
         $response = $this->actingAs($this->memberUser)->patchJson($endpoint);
-        $response->assertForbidden();
-        $response->assertJsonPath('message', 'Forbidden. You do not have the required permissions.');
+        $response->assertStatus(200);
     }
 
     // ==================== Admin-Only Routes ====================

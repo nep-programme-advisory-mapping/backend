@@ -125,6 +125,22 @@ class AdviserSubmissionController extends Controller
         return response()->json($query->paginate($request->integer('per_page', 25)));
     }
 
+    public function listProgrammeEntries()
+    {
+        $entries = \App\Models\ProgrammeEntry::with('organisation:id,name')
+            ->where('is_submitted', true)
+            ->select('id', 'programme_name', 'organisation_id')
+            ->orderBy('programme_name')
+            ->get()
+            ->map(fn($e) => [
+                'id'                => $e->id,
+                'programme_name'    => $e->programme_name,
+                'organisation_name' => $e->organisation?->name,
+            ]);
+
+        return response()->json(['data' => $entries]);
+    }
+
     public function coordinators(Request $request)
     {
         $user = $request->user();

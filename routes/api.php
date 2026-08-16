@@ -52,11 +52,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/refdata/counterpart-agencies', [RefdataController::class, 'counterpartAgencies']);
 
     Route::get('/user', function (Request $request) {
-        $user = $request->user();
+        $user = $request->user()->load('organisation:id,name');
 
         return array_merge(
             $user->only('id', 'name', 'email', 'role', 'status', 'organisation_id'),
             [
+                'organisation' => $user->organisation
+                    ? ['id' => $user->organisation->id, 'name' => $user->organisation->name]
+                    : null,
                 'permissions' => $user->effectivePermissionNames(),
                 'is_super_admin' => $user->isSuperAdmin(),
             ]
@@ -216,6 +219,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:advisory.create')->group(function () {
         Route::post('/adviser/submissions', [AdviserSubmissionController::class, 'store'])
             ->middleware('throttle:10,1');
+        Route::get('/adviser/programme-entries', [AdviserSubmissionController::class, 'listProgrammeEntries']);
     });
 
     Route::middleware('permission:advisory.create,advisory.update')->group(function () {

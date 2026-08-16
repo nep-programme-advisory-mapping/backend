@@ -79,8 +79,7 @@ class OrganisationController extends Controller
                 $q->where(function ($sub) use ($term) {
                     $sub->where('name', 'like', $term)
                         ->orWhere('contact_name', 'like', $term)
-                        ->orWhere('email', 'like', $term)
-                        ->orWhere('acronym', 'like', $term);
+                        ->orWhere('email', 'like', $term);
                 });
             })
             ->orderBy('name')

@@ -114,7 +114,7 @@ class RolePermissionSeeder extends Seeder
         'member_org' => [
             'display_name' => 'Member Organisation',
             'description' => 'Basic access to assigned programmes only',
-            'is_system' => true,
+            'is_system' => false,
             'is_super_admin' => false,
         ],
     ];

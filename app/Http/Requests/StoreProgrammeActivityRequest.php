@@ -42,6 +42,18 @@ class StoreProgrammeActivityRequest extends FormRequest
                 return;
             }
 
+            // "Other" needs its specify-text filled in, but only once the
+            // entry is actually being published — during autosave/draft
+            // saves the user may have only just ticked "Other" and hasn't
+            // typed anything yet, and that must not 422 (see
+            // UpdateProgrammeEntryRequest, which is what actually flips
+            // is_submitted; this endpoint just reads the value it already
+            // set on the same programme entry).
+            $entry = $this->route('programmeEntry');
+            if (!$entry || !$entry->is_submitted) {
+                return;
+            }
+
             $activities = $this->input('activities', []);
             $itemIds = collect($activities)->pluck('activity_item_id')->filter()->unique();
             $activityItems = ActivityItem::whereIn('id', $itemIds)->get()->keyBy('id');

@@ -108,8 +108,12 @@ class ProgrammeActivityTest extends TestCase
         $response->assertStatus(201);
     }
 
-    public function test_other_activity_requires_free_text(): void
+    public function test_other_activity_requires_free_text_when_entry_is_submitted(): void
     {
+        // "Other" needing its specify-text is a publish-readiness rule, not a
+        // general field-presence rule — it only applies once the entry is
+        // actually submitted/published. See test_draft_entry_allows_other_activity_without_free_text
+        // for the matching draft/autosave case, which must NOT 422.
         $organisation = Organisation::factory()->create();
         $user = User::factory()->create([
             'organisation_id' => $organisation->id,
@@ -117,6 +121,7 @@ class ProgrammeActivityTest extends TestCase
         ]);
         $entry = ProgrammeEntry::factory()->create([
             'organisation_id' => $organisation->id,
+            'is_submitted' => true,
         ]);
         $item = ActivityItem::factory()->create([
             'is_active' => true,
@@ -134,6 +139,37 @@ class ProgrammeActivityTest extends TestCase
         $response
             ->assertStatus(422)
             ->assertJsonValidationErrors(['activities.0.other_text']);
+    }
+
+    public function test_draft_entry_allows_other_activity_without_free_text(): void
+    {
+        // Autosave/draft saves must never trip required-field validation —
+        // a user may have only just ticked "Other" and not typed anything
+        // yet. The other_text requirement is deferred until publish time.
+        $organisation = Organisation::factory()->create();
+        $user = User::factory()->create([
+            'organisation_id' => $organisation->id,
+            'role' => 'member_org',
+        ]);
+        $entry = ProgrammeEntry::factory()->create([
+            'organisation_id' => $organisation->id,
+            'is_submitted' => false,
+        ]);
+        $item = ActivityItem::factory()->create([
+            'is_active' => true,
+            'is_other' => true,
+        ]);
+        $level = EducationLevel::factory()->create();
+        $payload = $this->validPayload($item, $level);
+        // No other_text at all — simulates the user having just selected
+        // "Other" without typing a specify value yet.
+
+        $response = $this->actingAs($user)->postJson(
+            "/api/programme-entries/{$entry->id}/activities",
+            $payload
+        );
+
+        $response->assertStatus(201);
     }
 
     public function test_other_activity_free_text_is_stored_in_review_queue(): void

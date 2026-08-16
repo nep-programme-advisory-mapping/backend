@@ -16,6 +16,14 @@ class StoreGovernmentAgreementsRequest extends FormRequest
     {
         $programmeEntry = $this->route('programmeEntry');
 
+        // Government agreements aren't required to publish at all (see
+        // hasCompletedAllRequired in programmeForm.ts — section 4 is
+        // optional), but a partially-typed row still shouldn't 422 during
+        // autosave. Once the entry is published, treat any row the user did
+        // add as needing its fields filled in properly.
+        $isSubmitted = $programmeEntry?->is_submitted;
+        $requiredIfSubmitted = $isSubmitted ? 'required' : 'sometimes';
+
         return [
             'agreements' => ['present', 'array'],
             'agreements.*.id' => [
@@ -25,7 +33,7 @@ class StoreGovernmentAgreementsRequest extends FormRequest
                     ->where('programme_entry_id', $programmeEntry->id),
             ],
             'agreements.*.counterpart_agency' => [
-                'required',
+                $requiredIfSubmitted,
                 Rule::in([
                     'MoEYS national level',
                     'Provincial Office of Education',
@@ -36,12 +44,12 @@ class StoreGovernmentAgreementsRequest extends FormRequest
                 ]),
             ],
             'agreements.*.status' => [
-                'required',
+                $requiredIfSubmitted,
                 Rule::in(['active', 'expired', 'under renewal', 'under negotiation']),
             ],
-            'agreements.*.institution_name' => ['required', 'string', 'max:255'],
+            'agreements.*.institution_name' => [$requiredIfSubmitted, 'string', 'max:255'],
             'agreements.*.nature' => [
-                'required',
+                $requiredIfSubmitted,
                 Rule::in([
                     'MoU',
                     'Letter of Understanding',

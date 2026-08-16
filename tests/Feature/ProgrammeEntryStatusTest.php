@@ -107,31 +107,39 @@ class ProgrammeEntryStatusTest extends TestCase
         $this->assertNotContains($this->submittedEntryOrgB->id, $ids);
     }
 
-    public function test_nep_admin_sees_their_own_authored_drafts_not_a_403()
+    public function test_nep_admin_can_list_all_draft_entries()
     {
-        // draft() delegates staff (no organisation of their own) to
-        // myDrafts() — "every organisation's drafts" isn't a meaningful
-        // view, so they see entries they personally authored instead. This
-        // admin hasn't authored any of the seeded entries, so the list is
-        // empty — but the endpoint is reachable (200), not forbidden.
+        // draft() now mirrors submitted()'s scoping exactly: an
+        // organisation-wide-access user (nep_admin/nep_coordinator) sees
+        // every organisation's drafts, so a reviewer can find and continue
+        // editing any organisation's draft — not just ones they personally
+        // authored. See test_staff_created_draft_appears_in_their_my_drafts_view
+        // for the separate, still-available "just what I authored" view.
         $response = $this->actingAs($this->adminUser)
             ->getJson('/api/programme-entries/draft');
 
         $response->assertOk();
-        $response->assertJsonCount(0, 'data');
+        $ids = collect($response->json('data'))->pluck('id');
+        $this->assertContains($this->draftEntryOrgA->id, $ids);
+        $this->assertContains($this->draftEntryOrgB->id, $ids);
     }
 
-    public function test_nep_coordinator_sees_their_own_authored_drafts_not_a_403()
+    public function test_nep_coordinator_can_list_all_draft_entries()
     {
         $response = $this->actingAs($this->coordinatorUser)
             ->getJson('/api/programme-entries/draft');
 
         $response->assertOk();
-        $response->assertJsonCount(0, 'data');
+        $ids = collect($response->json('data'))->pluck('id');
+        $this->assertContains($this->draftEntryOrgA->id, $ids);
+        $this->assertContains($this->draftEntryOrgB->id, $ids);
     }
 
     public function test_staff_created_draft_appears_in_their_my_drafts_view()
     {
+        // myDrafts() (/programme-entries/my-drafts) is untouched — still the
+        // "only what I personally authored" view, now reached directly
+        // rather than via a draft() redirect.
         $ownDraft = ProgrammeEntry::factory()->create([
             'organisation_id' => $this->orgA->id,
             'is_submitted' => false,
@@ -139,7 +147,7 @@ class ProgrammeEntryStatusTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->coordinatorUser)
-            ->getJson('/api/programme-entries/draft');
+            ->getJson('/api/programme-entries/my-drafts');
 
         $response->assertOk();
         $response->assertJsonCount(1, 'data');

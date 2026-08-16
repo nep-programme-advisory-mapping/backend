@@ -407,7 +407,7 @@ class ProgrammeEntryController extends Controller
     #[OA\Get(
         path: "/programme-entries/draft",
         summary: "List draft (unsubmitted) programme entries",
-        description: "For an organisation-bound user (e.g. member_org), returns their own organisation's draft entries. For a staff user with no organisation of their own (e.g. nep_admin/nep_coordinator), delegates to myDrafts() instead — 'all draft entries platform-wide' isn't a meaningful view, so staff instead see the entries they've personally authored on an org's behalf.",
+        description: "For an organisation-bound user (e.g. member_org), returns their own organisation's draft entries only. For a programmes.view-own holder (e.g. nep_staff), returns only entries they personally authored — see myDrafts(). For any other user with organisation-wide access (e.g. nep_admin/nep_coordinator), returns every organisation's draft entries platform-wide, so an authorized reviewer can find and continue editing any organisation's draft, not just ones they personally created themselves. Mirrors submitted()'s scoping exactly, just filtered to unsubmitted entries.",
         security: [["bearerAuth" => []]],
         tags: ["Programme Entries"],
         parameters: [
@@ -443,12 +443,12 @@ class ProgrammeEntryController extends Controller
     )]
     public function draft(Request $request)
     {
-        $user = $request->user();
-
-        if ($user->hasOrganisationWideAccess()) {
-            return $this->myDrafts($request);
-        }
-
+        // Symmetric with submitted() below — entriesByStatus() already
+        // applies the right per-user scoping (own-authored only for
+        // programmes.view-own holders, own-organisation only for org-bound
+        // users, everything for organisation-wide access). No special
+        // casing needed here; see myDrafts() for the separate "just what I
+        // personally authored" view staff can opt into instead.
         return $this->entriesByStatus($request, false);
     }
 

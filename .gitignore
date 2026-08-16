@@ -1,0 +1,46 @@
+/.phpunit.cache
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/storage/logs/*.log
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/app/public/*
+/bootstrap/cache/*.php
+/vendor
+.env
+.env.backup
+.env.production
+.env.*
+!.env.example
+# .env.testing has no real secrets (dedicated local/CI test DB, dummy
+# APP_KEY, no AI/mail/broadcast credentials) — it exists specifically so
+# `php artisan test` and CI both pick it up automatically, which requires
+# it to actually be committed.
+!.env.testing
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+.DS_Store
+Thumbs.db
+
+**/caddy
+frankenphp
+frankenphp-worker.php
+
+# Ignore every README variant (any case, any suffix) except the canonical README.md
+[Rr][Ee][Aa][Dd][Mm][Ee]*
+!README.md

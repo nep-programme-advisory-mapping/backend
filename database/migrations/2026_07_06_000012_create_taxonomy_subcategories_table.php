@@ -1,0 +1,28 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    
+    public function up(): void
+    {
+        Schema::create('taxonomy_subcategories', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('category_id')->constrained('taxonomy_categories')->onDelete('cascade');
+            $table->string('code')->unique();
+            $table->string('label');
+            $table->boolean('is_active')->default(true);
+            $table->string('version')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    
+    public function down(): void
+    {
+        Schema::dropIfExists('taxonomy_subcategories');
+    }
+};

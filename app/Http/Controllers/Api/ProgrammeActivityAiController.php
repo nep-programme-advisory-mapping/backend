@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityCategory;
 use App\Models\ActivityItem;
-use App\Services\AI\ClaudeService;
+use App\Services\AI\GroqService;
 use App\Services\ProgrammeDescriptionExtractor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -123,8 +123,8 @@ Programme description:
 PROMPT;
 
         try {
-            $claude   = App::make(ClaudeService::class);
-            $response = $claude->generateContent($prompt, [
+            $groq     = App::make(GroqService::class);
+            $response = $groq->generateContent($prompt, [
                 'temperature'     => 0.1,
                 'response_format' => ['type' => 'json_object'],
             ]);
@@ -245,8 +245,8 @@ Programme description:
 PROMPT;
 
         try {
-            $claude   = App::make(ClaudeService::class);
-            $response = $claude->generateContent($prompt, [
+            $groq     = App::make(GroqService::class);
+            $response = $groq->generateContent($prompt, [
                 'temperature'     => 0.1,
                 'response_format' => ['type' => 'json_object'],
             ]);

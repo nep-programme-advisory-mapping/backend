@@ -13,9 +13,9 @@ class DatabaseSeeder extends Seeder
             EducationLevelSeeder::class,
             BudgetBandSeeder::class,
             TaxonomySeeder::class,
-            OrganisationSeeder::class,
-            OrganisationAccountSeeder::class,
-            ProgrammeEntriesSeeder::class,
+            // OrganisationSeeder::class,
+            // OrganisationAccountSeeder::class,
+            // ProgrammeEntriesSeeder::class,
             UserSeeder::class,
             RolePermissionSeeder::class,
         ]);

@@ -7,7 +7,7 @@ use App\Models\AdvisoryNote;
 use App\Models\Province;
 use App\Services\Adviser\MapOverlapMatcher;
 use App\Services\Adviser\ProfileExtractor;
-use App\Services\AI\GroqService;
+use App\Services\AI\ClaudeService;
 use App\Services\AI\PromptBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,8 +80,7 @@ class AdviserAnalysisController extends Controller
             $submission->submitting_party
         );
 
-        $groq       = App::make(GroqService::class);
-        $aiResponse = $groq->generateContent($prompt);
+        $aiResponse = App::make(ClaudeService::class)->generateContent($prompt);
 
         $submission->update([
             'status'                     => 'analysed',

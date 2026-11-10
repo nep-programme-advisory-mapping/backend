@@ -31,8 +31,9 @@ return [
 
     'claude' => [
         'api_key' => env('CLAUDE_API_KEY'),
-        'model' => env('CLAUDE_MODEL', 'claude-sonnet-4-5'),
-        'timeout' => env('CLAUDE_TIMEOUT', 30),
+        'model' => env('CLAUDE_MODEL', 'claude-opus-5-5'),
+        'effort' => env('CLAUDE_EFFORT', 'medium'),
+        'timeout' => env('CLAUDE_TIMEOUT', 120),
         'retry_attempts' => env('CLAUDE_RETRY_ATTEMPTS', 2),
         'retry_delay' => env('CLAUDE_RETRY_DELAY', 500),
     ],

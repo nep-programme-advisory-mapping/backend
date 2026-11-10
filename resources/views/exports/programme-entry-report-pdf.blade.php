@@ -388,6 +388,18 @@
     </div>
     @endif
 
+    <!-- Section 6: Current Collaborations -->
+    @if($entry->collaborations && count($entry->collaborations) > 0)
+    <div class="section">
+        <div class="section-header">6. Current Collaborations</div>
+        <div style="margin-top: 4px;">
+            @foreach($entry->collaborations as $collaboration)
+                <span class="keyword-chip">{{ $collaboration->organisation_name }}</span>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     <!-- Footer -->
     <div class="footer">
         Confidential — NGO Education Partnership (NEP) System • Official Programme Entry Report

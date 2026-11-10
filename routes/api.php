@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\OrganisationProfileController;
 use App\Http\Controllers\Api\ProgrammeEntryController;
 use App\Http\Controllers\Api\ProgrammeActivityController;
 use App\Http\Controllers\Api\ProgrammeGeographyController;
+use App\Http\Controllers\Api\EntryCollaborationController;
 use App\Http\Controllers\Api\EntryKeywordController;
 use App\Http\Controllers\Api\GovernmentAgreementController;
 use App\Http\Controllers\Api\Admin\OrganisationController;
@@ -140,6 +141,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/programme-entries/{programmeEntry}/activities', [ProgrammeActivityController::class, 'index']);
         Route::post('/programme-entries/{programmeEntry}/activities', [ProgrammeActivityController::class, 'store']);
         Route::put('/programme-entries/{programmeEntry}/keywords', [EntryKeywordController::class, 'store']);
+        Route::put('/programme-entries/{programmeEntry}/collaborations', [EntryCollaborationController::class, 'store']);
         Route::put('/programme-entries/{programmeEntry}/geography', [ProgrammeGeographyController::class, 'store']);
         Route::put('/programme-entries/{programmeEntry}/government-agreements', [GovernmentAgreementController::class, 'store']);
 

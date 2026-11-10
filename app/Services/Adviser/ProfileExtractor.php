@@ -4,7 +4,7 @@ namespace App\Services\Adviser;
 
 use App\Models\ActivityItem;
 use App\Models\Province;
-use App\Services\AI\GroqService;
+use App\Services\AI\ClaudeService;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Cache;
 
@@ -54,11 +54,7 @@ Document:
 PROMPT;
 
         try {
-            $ai       = App::make(GroqService::class);
-            $response = $ai->generateContent($prompt, [
-                'temperature'     => 0.1,
-                'response_format' => ['type' => 'json_object'],
-            ]);
+            $response = App::make(ClaudeService::class)->generateContent($prompt);
 
             $validItemIds     = $items->pluck('id')->flip();
             $validProvinceIds = $provinces->pluck('id')->flip();

@@ -392,6 +392,7 @@ class ProgrammeEntryController extends Controller
             'organisation',
             'budgetBand',
             'keywords',
+            'collaborations',
             'locations.province',
             'locations.district',
             'locations.commune',
@@ -602,6 +603,7 @@ class ProgrammeEntryController extends Controller
             'locations.district',
             'governmentAgreements',
             'keywords',
+            'collaborations',
         ]);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.programme-entry-report-pdf', [
@@ -644,6 +646,7 @@ class ProgrammeEntryController extends Controller
                 'locations.district',
                 'governmentAgreements',
                 'keywords',
+                'collaborations',
             ])
             ->chunk(50, function ($chunk) use ($programmeEntries) {
                 $programmeEntries->push(...$chunk);

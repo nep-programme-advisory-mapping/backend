@@ -70,6 +70,11 @@ class ProgrammeEntry extends Model
         return $this->hasMany(EntryKeyword::class);
     }
 
+    public function collaborations()
+    {
+        return $this->hasMany(EntryCollaboration::class);
+    }
+
     public function locations()
     {
         return $this->hasMany(ProgrammeLocation::class);

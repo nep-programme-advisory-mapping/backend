@@ -10,6 +10,7 @@ class ClaudeService
 {
     private string $apiKey;
     private string $model;
+    private string $effort;
     private string $endpoint = 'https://api.anthropic.com/v1/messages';
     private int $timeout;
     private int $retryAttempts;
@@ -18,8 +19,9 @@ class ClaudeService
     public function __construct()
     {
         $this->apiKey = config('services.claude.api_key') ?? '';
-        $this->model = config('services.claude.model') ?? 'claude-sonnet-4-5';
-        $this->timeout = (int) (config('services.claude.timeout') ?? 30);
+        $this->model = config('services.claude.model') ?? 'claude-opus-5-5';
+        $this->effort = config('services.claude.effort') ?? 'medium';
+        $this->timeout = (int) (config('services.claude.timeout') ?? 120);
         $this->retryAttempts = (int) (config('services.claude.retry_attempts') ?? 2);
         $this->retryDelay = (int) (config('services.claude.retry_delay') ?? 500);
 
@@ -30,16 +32,19 @@ class ClaudeService
 
     public function generateContent(string $prompt, array $options = []): array
     {
-        // `response_format` is an OpenAI-compatible option used by the former
-        // Groq integration. Claude is already instructed to return JSON in the
-        // prompt, so do not forward this unsupported field to Anthropic.
-        unset($options['response_format']);
+        // Current Claude models reject `temperature` with a 400, and
+        // `response_format` is an OpenAI-style option they don't accept either.
+        // The prompts already ask for JSON, so neither is forwarded.
+        unset($options['response_format'], $options['temperature']);
 
         $payload = array_merge([
             'model' => $this->model,
             'messages' => [['role' => 'user', 'content' => $prompt]],
-            'temperature' => 0.7,
-            'max_tokens' => 4096,
+            'max_tokens' => 16000,
+            'output_config' => ['effort' => $this->effort],
+            // If the model declines on safety grounds, let the API retry on a
+            // suitable fallback model inside the same request.
+            'fallbacks' => 'default',
         ], $options);
 
         $attempt = 0;
@@ -52,6 +57,7 @@ class ClaudeService
                         'Content-Type' => 'application/json',
                         'x-api-key' => $this->apiKey,
                         'anthropic-version' => '2023-06-01',
+                        'anthropic-beta' => 'server-side-fallback-2026-07-01',
                     ])
                     ->post($this->endpoint, $payload);
 
@@ -107,45 +113,40 @@ class ClaudeService
 
     private function parseResponse(array $data): array
     {
-        $text = $data['content'][0]['text'] ?? null;
+        $stopReason = $data['stop_reason'] ?? null;
 
-        if ($text === null) {
-            throw new \RuntimeException('AI response did not contain expected content.');
+        if ($stopReason === 'refusal') {
+            Log::warning('Claude declined the request', ['category' => $data['stop_details']['category'] ?? null]);
+            throw new \RuntimeException('The AI declined to analyse this content. Please review the document and try again.', 503);
+        }
+
+        // A response can include thinking and fallback blocks, so the answer isn't
+        // always the first block. Text written before a fallback belongs to the
+        // model that declined, so only the text after the last fallback is kept.
+        $text = '';
+        foreach ($data['content'] ?? [] as $block) {
+            if (($block['type'] ?? null) === 'fallback') {
+                $text = '';
+            } elseif (($block['type'] ?? null) === 'text') {
+                $text .= $block['text'] ?? '';
+            }
+        }
+
+        if (trim($text) === '') {
+            throw new \RuntimeException('AI response did not contain expected content.', 503);
         }
 
         $parsed = $this->parseJsonFromText($text);
 
-        if (is_array($parsed) && isset($parsed['section_a'])) {
-            return $parsed;
-        }
-
-        if (is_array($parsed) && array_is_list($parsed)) {
-            return ['_raw_array' => $parsed];
-        }
-
-        if (is_array($parsed) && isset($parsed['codes'])) {
-            return $parsed;
-        }
-
         if ($parsed === null) {
-            return [
-                'executive_summary' => $text,
-                'similar_or_overlapping_programmes' => [],
-                'potential_duplication' => 'Unable to parse structured response.',
-                'coverage_gaps' => 'Unable to parse structured response.',
-                'recommendations' => 'Unable to parse structured response.',
-                'confidence_notes' => 'The AI response could not be parsed into a structured format.',
-            ];
+            Log::warning('AI response could not be parsed as JSON', [
+                'stop_reason' => $stopReason,
+                'raw_length' => strlen($text),
+            ]);
+            throw new \RuntimeException('AI returned a non-JSON response. The response may have been cut off; please try again.', 503);
         }
 
-        return array_merge([
-            'executive_summary' => 'No executive summary was generated.',
-            'similar_or_overlapping_programmes' => [],
-            'potential_duplication' => 'No duplication assessment was generated.',
-            'coverage_gaps' => 'No coverage gap analysis was generated.',
-            'recommendations' => 'No recommendations were generated.',
-            'confidence_notes' => '',
-        ], $parsed);
+        return array_is_list($parsed) ? ['_raw_array' => $parsed] : $parsed;
     }
 
     private function parseJsonFromText(string $text): ?array

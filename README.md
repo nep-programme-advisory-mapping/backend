@@ -62,9 +62,9 @@ Key `.env` sections (see `.env.example` for the full list and inline comments):
 - **Cache/Queue** — Redis-backed (`CACHE_STORE`, `QUEUE_CONNECTION`).
 - **Broadcasting** — Reverb credentials (`REVERB_APP_ID/KEY/SECRET`); the `VITE_REVERB_*` mirrors exist so the frontend's Echo client can read the same values.
 - **Mail** — SMTP (Gmail by default). `MAIL_FROM_ADDRESS` must share a domain with `MAIL_USERNAME`, or mail sent from it is likely to be flagged as spam by non-Gmail providers.
-- **AI provider** — required for advisory-note generation and programme-activity AI features. Only one provider should be active:
-  - **Groq** (default): set `GROQ_API_KEY` (`config/services.php` → `groq`).
-  - **Claude**: set `CLAUDE_API_KEY` (`config/services.php` → `claude`). Controllers currently resolve `App\Services\AI\GroqService` directly via `App::make()`; switching the active provider means updating those call sites (or introducing an interface binding in `AppServiceProvider`) in addition to the env vars.
+- **AI providers** — each feature calls its provider directly via `App::make()`, so both may need keys:
+  - **Claude** (The Adviser's analysis and profile extraction): set `CLAUDE_API_KEY` (`config/services.php` → `claude`).
+  - **Groq** (programme-form AI autofill and activity suggestions): set `GROQ_API_KEY` (`config/services.php` → `groq`).
 - **ImageKit** — required for organisation logo uploads (`IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT`).
 - **AWS S3** — optional alternative file storage.
 - **Sanctum** — `SANCTUM_STATEFUL_DOMAINS` must list every frontend origin using cookie-based auth.
